@@ -2,18 +2,21 @@ import os
 import json
 from datetime import datetime
 
+import feedparser
 import gspread
 from google.oauth2.service_account import Credentials
 
 
+RSS_URL = "https://openai.com/blog/rss.xml"  # 예시 RSS (OpenAI 블로그)
+
+
 def main():
-    # GitHub Secrets에서 값 읽기
+    # --- 인증 ---
     service_account_info = json.loads(
         os.environ["GOOGLE_SERVICE_ACCOUNT_JSON"]
     )
     sheet_id = os.environ["GOOGLE_SHEET_ID"]
 
-    # Google Sheets 인증
     scopes = [
         "https://www.googleapis.com/auth/spreadsheets",
         "https://www.googleapis.com/auth/drive",
@@ -22,22 +25,27 @@ def main():
         service_account_info, scopes=scopes
     )
     client = gspread.authorize(creds)
-
-    # 시트 열기 (첫 번째 시트)
     sheet = client.open_by_key(sheet_id).sheet1
 
-    # 테스트용 한 줄 데이터
-    now = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
-    row = [
-        now,
-        "GitHub Actions 테스트",
-        "https://github.com",
-        "이 행이 보이면 연동 성공",
-        "system"
-    ]
+    # --- RSS 읽기 ---
+    feed = feedparser.parse(RSS_URL)
 
-    sheet.append_row(row, value_input_option="USER_ENTERED")
-    print("Row appended successfully")
+    for entry in feed.entries[:5]:  # 최신 5개만
+        published = entry.get("published", "")
+        title = entry.get("title", "")
+        link = entry.get("link", "")
+
+        row = [
+            published,
+            title,
+            link,
+            "rss",
+            "openai"
+        ]
+
+        sheet.append_row(row, value_input_option="USER_ENTERED")
+
+    print(f"Inserted {len(feed.entries[:5])} rows")
 
 
 if __name__ == "__main__":
